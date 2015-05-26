@@ -1,0 +1,91 @@
+<head>
+  <meta charset=utf-8 />
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/q.js/1.4.1/q.js"></script>
+  <script type="text/javascript" src="lib/pureweb/pureweb.min.js"></script>
+  <script type="text/javascript" src="lib/pureweb/pureweb.h264.min.js"></script>  
+  <script type="text/javascript" src="v1.js"></script>
+</head>
+
+<body>
+  
+  <script type="text/javascript">
+    
+    // use require / commonjs loading
+    var api = hue(Q, pureweb);
+    var framecount = 0;
+    var attachedView = null;
+    
+    function errorHandler(err) {
+      throw err;
+    }
+    
+    api.error = errorHandler;
+    
+    // create HueSpace session
+    api.createSession('http://service.huespace.pureweb.io/pureweb/app?name=HueSpace', {
+      'username': 'admin',
+      'password': 'admin'
+    }, 5000).then(function(session){           
+      document.getElementById("status").innerHTML = "Connected";
+    }, function(err){
+      errorHandler(err);
+    }).then(function(){             
+       // wait until service is ready
+       document.getElementById("status").innerHTML = "Waiting for ready";       
+       return api.ready();              
+    }).then(function(){      
+      // attach a view
+      document.getElementById("status").innerHTML = "Waiting for renderer";  
+            
+      api.viewUpdated = function() {
+        
+        if (attachedView === null || attachedView === undefined) return;
+        
+        framecount++;
+        document.getElementById("status").innerHTML = "Frame: " + framecount + ", Mbps: " 
+                                                    + Math.round(pureweb.getClient().mbps.rate) 
+                                                    + ", fps: " + Math.round(attachedView.fps.frequency);
+      };
+      
+       return api.attachView("view");
+    }).then(function(view) {
+      attachedView = view;
+      
+      // Do some work
+      var v = api.volumes();
+      v.northBrowsePhase2 = true;
+      v.onnia2 = true;
+      
+      api.volumes(v).then(function(volumes){
+        console.log(volumes);
+      });
+    }).fail(function(err){
+      console.log("Failure: " + err);
+    }).done();
+    
+
+    function toggleVolume() {
+      var v = api.volumes();
+      v.onnia2 = !v.onnia2;      
+      api.volumes(v).then(function(volumes){
+        console.log(volumes);
+      });
+    } 
+    
+    function toggleFilter() {
+      var t = api.transforms();
+      t.enabled = !t.enabled;
+      t.channels = 1;
+      api.transforms(t).then(function(transforms){
+        console.log(transforms);
+      });
+    }
+       
+    window.onbeforeunload = function() {
+      api.close();
+    };   
+  </script>
+  
+  <div id="status"></div>
+  <div width="1280" height="720" style="border:1px solid black; text-align:center; width:1280px; height:720px;" id="view"></div>
+</body>
